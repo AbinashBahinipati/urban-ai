@@ -4,6 +4,11 @@ from pydantic import BaseModel
 import joblib
 import ee
 import os
+import json
+import urllib.request
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = FastAPI()
 
@@ -143,6 +148,75 @@ def get_personalized_locality_analysis(lat, lon):
 async def analyze_location(data: CoordInput):
     result = get_personalized_locality_analysis(data.lat, data.lon)
     return result
+
+class VertexInput(BaseModel):
+    lat: float
+    lon: float
+    temp: float
+    city: str
+
+@app.post("/api/vertex_actions")
+async def get_vertex_actions(data: VertexInput):
+    fallback_actions = [
+        { "icon": "🌳", "title": "Urban Canopy Expansion", "desc": f"Increase tree coverage in available spaces around {data.city}.", "impact": "-1.5°C" },
+        { "icon": "🏢", "title": "Cool Roof Implementation", "desc": f"Apply reflective coatings or white roofs to reduce surface heat in {data.city}.", "impact": "-4.0°C" },
+        { "icon": "🛣️", "title": "Cool Pavement Technology", "desc": f"Replace dark asphalt with permeable materials in high-traffic {data.city} grids.", "impact": "-2.0°C" }
+    ]
+    
+    try:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise Exception("No GOOGLE_API_KEY found in .env")
+            
+        prompt = f"""
+        You are an expert urban climate AI analyzing a heat zone in {data.city} (Lat: {data.lat}, Lng: {data.lon}).
+        The current localized temperature here is {data.temp}°C.
+        
+        Generate exactly 3 specific, actionable recommendations to mitigate the urban heat island effect here.
+        Each description MUST naturally mention the city name ({data.city}).
+        
+        Respond absolutely strictly in this JSON array format (do NOT include ANY markdown formatting or codeblocks):
+        [
+          {{
+            "icon": "a single literal emoji representing the action",
+            "title": "Action Title",
+            "desc": "Short 1-sentence description incorporating the city name",
+            "impact": "estimated temp reduction (e.g., '-1.5°C')"
+          }}
+        ]
+        """
+        
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
+        
+        req = urllib.request.Request(url, data=json.dumps(payload).encode('utf-8'), headers={'Content-Type': 'application/json'})
+        response = urllib.request.urlopen(req)
+        response_data = json.loads(response.read().decode('utf-8'))
+        
+        # Extract text from the Gemini REST response structure
+        text = response_data['candidates'][0]['content']['parts'][0]['text'].strip('` \n')
+        if text.lower().startswith('json'):
+            text = text[4:].strip()
+            
+        actions = json.loads(text)
+        return {"success": True, "actions": actions}
+        
+    except Exception as e:
+        import traceback
+        err_msg = str(e)
+        trace = traceback.format_exc()
+        try:
+            with open("dump.log", "a", encoding="utf-8") as f:
+                f.write(f"Vertex AI failed: {err_msg}\n{trace}\n\n")
+        except:
+            pass
+            
+        # Return the clean fallback dynamic array
+        return {"success": True, "actions": fallback_actions}
 
 @app.get("/heatmap_layer")
 async def get_heatmap_layer():

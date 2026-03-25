@@ -1488,10 +1488,12 @@
          );
       };
 
+
+
       const DetailedAnalysis = ({ activeLocation }) => {
         return e(motion.div, { id: 'detailed-analysis', initial: "hidden", whileInView: "visible", viewport: { once: true, margin: "-100px" }, variants: containerVar, style: { marginTop: '100px', scrollMarginTop: '120px' } },
            e(motion.h2, { variants: customVar, style: { fontSize: '2rem', color: '#fff', marginBottom: '20px' } }, "Detailed Analysis: " + activeLocation.name),
-           e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' } },
+           e('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '30px' } },
               e(motion.div, { variants: customVar, initial: "rest", whileHover: "hover" },
                  e(motion.div, { variants: floatVar, className: 'analysis-card', style: { padding: '30px', background: 'rgba(0,0,0,0.4)', borderRadius: '20px', border: '1px solid rgba(0, 255, 204, 0.2)', backdropFilter: 'blur(10px)' } },
                     e(motion.h3, { variants: customVar, style: { color: '#00ffcc', marginBottom: '20px', textTransform: 'uppercase', letterSpacing: '1px', fontSize: '0.9rem' } }, "Thermal Telemetry"),
@@ -1602,45 +1604,98 @@
          );
       };
 
-      /* ─── DYNAMIC RECOMMENDED ACTIONS COMPONENT ─── */
-      const RecommendedCoolingActions = ({ location }) => {
-         // Determine Heat Intensity
-         const tempVal = parseFloat(location.currentTemp) || 35;
-         const indexVal = parseFloat(location.index) || 5;
-         let heatIntensity = 'medium';
-         if (tempVal >= 42 || indexVal > 8.5) heatIntensity = 'high';
-         else if (tempVal <= 35 && indexVal < 5) heatIntensity = 'low';
-
-         // Determine Zone Type
-         const nameLower = (location.name || '').toLowerCase();
-         const alertLower = (location.alert || '').toLowerCase();
-         let zoneType = 'semi-urban';
-         if (nameLower.includes('cbd') || nameLower.includes('city') || alertLower.includes('urban') || nameLower.includes('delhi') || nameLower.includes('kolkata')) zoneType = 'urban';
-         else if (nameLower.includes('zone') || nameLower.includes('industrial') || alertLower.includes('industry')) zoneType = 'industrial';
-
-         // Recommendations Logic
-         let actions = [];
+      /* ─── DYNAMIC RECOMMENDED ACTIONS COMPONENT (INTELLIGENT LOCAL ENGINE) ─── */
+      const getRecommendations = (temp, uhiLevel, rise, lat, lng, city) => {
+         const actions = [];
          
-         if (zoneType === 'industrial') {
-            actions = [
-               { icon: '🏭', title: 'Reflective Industrial Roofing', desc: 'Use heat-reflective materials to minimize heat buildup.', impact: '-3°C' },
-               { icon: '🌫️', title: 'Evaporative Cooling Systems', desc: 'Deploy mist or water-based cooling systems for immediate temperature reduction.', impact: '-2.5°C' },
-               { icon: '🌬️', title: 'Ventilation Optimization', desc: 'Improve airflow using exhaust systems and passive cooling design.', impact: '-1.5°C' }
-            ];
-         } else if (zoneType === 'urban' || heatIntensity === 'high') {
-            actions = [
-               { icon: '🌳', title: 'Urban Canopy Expansion', desc: 'Increase tree coverage in available spaces.', impact: '-1.5°C' },
-               { icon: '🏢', title: 'Cool Roof Implementation', desc: 'Apply reflective coatings or white roofs to reduce surface heat.', impact: '-4°C' },
-               { icon: '🛣️', title: 'Cool Pavement Technology', desc: 'Replace dark asphalt with reflective or permeable materials.', impact: '-2°C' },
-               { icon: '⚡', title: 'Solar Panel Shading', desc: 'Install rooftop solar panels to provide shade and reduce heat.', impact: '-1°C' }
-            ];
-         } else {
-            actions = [
-               { icon: '💧', title: 'Green Infrastructure', desc: 'Implement bioswales and rain gardens for natural cooling.', impact: '-1.5°C' },
-               { icon: '🏡', title: 'Community Shading', desc: 'Construct shaded walkways and pergolas in public spaces.', impact: '-2°C' },
-               { icon: '🌿', title: 'Vertical Gardens', desc: 'Add green walls to building exteriors to insulate against heat.', impact: '-1.5°C' }
-            ];
+         // Helper to add unique actions
+         const addAction = (title, icon, impact, desc) => {
+            if (!actions.some(a => a.title === title)) {
+               actions.push({ title, icon, impact, desc: desc.replace('{city}', city) });
+            }
+         };
+
+         // 1. Logic: Temperature > 40°C
+         if (temp > 40) {
+            addAction("Cool Roof Implementation", "🏢", "-4.0°C", "Apply reflective coatings or white roofs to reduce surface heat in {city}.");
+            addAction("Cool Pavement Technology", "🛣️", "-2.0°C", "Replace dark asphalt with permeable materials in high-traffic {city} grids.");
          }
+         
+         // 2. Logic: UHI Risk is High
+         if (uhiLevel.toLowerCase().includes("high") || uhiLevel.toLowerCase().includes("extreme")) {
+            addAction("Urban Canopy Expansion", "🌳", "-1.5°C", "Increase tree coverage in available spaces around {city}.");
+            addAction("Green Corridors", "🛤️", "-1.8°C", "Develop shaded walkways and natural cooling pathways.");
+         }
+         
+         // 3. Logic: Temperature rise > 2°C
+         if (rise > 2.0) {
+            addAction("Reflective Materials Deployment", "✨", "-3.0°C", "Mandate high-albedo materials for all new public infrastructure.");
+            addAction("Heat Resilient Infrastructure", "🏗️", "-2.5°C", "Upgrade power grids and transit lines to withstand thermal stress.");
+         }
+         
+         // 4. Logic: Temperature < 30°C
+         if (temp < 30) {
+            addAction("Maintain Green Cover", "🌿", "-0.5°C", "Preserve existing parks and vegetation health in {city}.");
+            addAction("Sustainable Monitoring", "📡", "N/A", "Install IoT sensors to track micro-climate variations proactively.");
+         }
+
+         // General Fallback Pool (in case conditions aren't met or to add variety)
+         const fallbacks = [
+            { title: "Vertical Gardens", icon: "🌿", impact: "-1.5°C", desc: "Add green walls to building exteriors to insulate against thermal load." },
+            { title: "Solar Panel Shading", icon: "⚡", impact: "-1.0°C", desc: "Install rooftop solar panels to provide shade and reduce heat absorption." },
+            { title: "Green Infrastructure", icon: "💧", impact: "-1.5°C", desc: "Implement bioswales and rain gardens across {city} for natural cooling." },
+            { title: "Community Shading", icon: "🏡", impact: "-2.0°C", desc: "Construct shaded walkways and pergolas in public suburban spaces." },
+            { title: "Smart Glazing", icon: "🪟", impact: "-2.5°C", desc: "Install electrochromic glass on high-rise facades to block heat." },
+            { title: "Micro-Parks", icon: "🏞️", impact: "-1.8°C", desc: "Convert vacant lots into small cooling green spaces for residents." }
+         ];
+
+         // Deterministic seed based on coordinates to guarantee variety across map clicks
+         const seed = Math.floor(Math.abs((lat + lng) * 100));
+
+         // Supplement with fallbacks if we have less than 3 actions
+         let fIdx = seed % fallbacks.length;
+         while (actions.length < 3) {
+            const f = fallbacks[fIdx % fallbacks.length];
+            addAction(f.title, f.icon, f.impact, f.desc);
+            fIdx++;
+         }
+
+         // If we have more than 3 actions (multiple conditions hit), deterministically pick 3 so it doesn't overflow UI
+         if (actions.length > 3) {
+            const selected = [];
+            let idx = seed % actions.length;
+            while(selected.length < 3) {
+               selected.push(actions[idx % actions.length]);
+               idx = (idx + 1) % actions.length;
+            }
+            return selected;
+         }
+
+         return actions;
+      };
+
+      const RecommendedCoolingActions = ({ location }) => {
+         const [actions, setActions] = useState([]);
+         const [loading, setLoading] = useState(true);
+
+         useEffect(() => {
+            // Simulate a brief AI "analysis" loading state for premium feel
+            setLoading(true);
+            const timer = setTimeout(() => {
+               const tempVal = parseFloat(location.currentTemp) || 35.0;
+               const riseVal = parseFloat((location.tendency || "+0").replace('+', '').replace('°C', '')) || 0;
+               const uhiLevel = location.alert || "Moderate";
+               const lat = parseFloat(location.lat) || 0;
+               const lng = parseFloat(location.lng) || 0;
+               const city = location.name ? location.name.split(',')[0] : 'this district';
+
+               const generatedActions = getRecommendations(tempVal, uhiLevel, riseVal, lat, lng, city);
+               setActions(generatedActions);
+               setLoading(false);
+            }, 600); // 600ms fake loading
+
+            return () => clearTimeout(timer);
+         }, [location.lat, location.lng]);
 
          const listVariants = {
             hidden: { opacity: 0 },
@@ -1656,34 +1711,52 @@
          };
 
          return e(motion.div, { 
-            key: location.name, // Force re-render/animation on location change
-            variants: listVariants, 
-            initial: "hidden", 
-            animate: "show",
-            style: { display: 'flex', flexDirection: 'column', gap: '10px' }
+            style: { display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '235px' }
          }, 
-            actions.map((act, idx) => 
-               e(motion.div, { 
-                  key: idx, 
-                  variants: itemVariants,
-                  style: { 
-                     background: 'rgba(255,255,255,0.03)', 
-                     borderLeft: '3px solid #00ffcc', 
-                     padding: '12px 15px', 
+            loading ? 
+               [0, 1, 2].map((i) => e(motion.div, {
+                  key: `skeleton-${i}`,
+                  animate: { opacity: [0.3, 0.7, 0.3] },
+                  transition: { duration: 1.5, repeat: Infinity, delay: i * 0.2 },
+                  style: {
+                     background: 'rgba(255,255,255,0.05)',
+                     borderLeft: '3px solid rgba(0, 255, 204, 0.3)',
+                     height: '75px',
                      borderRadius: '0 8px 8px 0',
-                     display: 'flex',
-                     flexDirection: 'column',
-                     gap: '6px',
-                     boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
-                  } 
+                     marginBottom: i < 2 ? '0px' : '0'
+                  }
+               }))
+            :
+               e(motion.div, {
+                  key: location.name + '-loaded', // Force re-render/animation when new data arrives
+                  variants: listVariants,
+                  initial: "hidden",
+                  animate: "show",
+                  style: { display: 'flex', flexDirection: 'column', gap: '10px' }
                },
-                  e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-                     e('strong', { style: { color: '#00ffcc', fontSize: '0.85rem', letterSpacing: '0.5px' } }, `${act.icon} ${act.title}`),
-                     e('span', { style: { background: 'rgba(0, 255, 204, 0.1)', color: '#00ffcc', padding: '3px 8px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold' } }, act.impact)
-                  ),
-                  e('p', { style: { color: '#aaa', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' } }, act.desc)
+                  actions.map((act, idx) => 
+                     e(motion.div, { 
+                        key: idx, 
+                        variants: itemVariants,
+                        style: { 
+                           background: 'rgba(255,255,255,0.03)', 
+                           borderLeft: '3px solid #00ffcc', 
+                           padding: '12px 15px', 
+                           borderRadius: '0 8px 8px 0',
+                           display: 'flex',
+                           flexDirection: 'column',
+                           gap: '6px',
+                           boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
+                        } 
+                     },
+                        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                           e('strong', { style: { color: '#00ffcc', fontSize: '0.85rem', letterSpacing: '0.5px' } }, `${act.icon} ${act.title}`),
+                           e('span', { style: { background: 'rgba(0, 255, 204, 0.1)', color: '#00ffcc', padding: '3px 8px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 'bold' } }, act.impact)
+                        ),
+                        e('p', { style: { color: '#aaa', fontSize: '0.8rem', margin: 0, lineHeight: '1.4' } }, act.desc)
+                     )
+                  )
                )
-            )
          );
       };
 
