@@ -186,7 +186,7 @@ async def get_vertex_actions(data: VertexInput):
         ]
         """
         
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
         payload = {
             "contents": [{
                 "parts": [{"text": prompt}]

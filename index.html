@@ -1417,6 +1417,140 @@
         );
       };
 
+      /* ─── GEMINI CHATBOT COMPONENT ─── */
+      const GeminiChatbot = () => {
+        const [isOpen, setIsOpen] = useState(false);
+        const [messages, setMessages] = useState([
+          { role: 'ai', text: "Hello! I'm your UrbanCool AI assistant. How can I help you analyze Urban Heat Islands today?" }
+        ]);
+        const [input, setInput] = useState('');
+        const [loading, setLoading] = useState(false);
+        const chatEndRef = useRef(null);
+
+        const scrollToBottom = () => {
+          chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        };
+
+        useEffect(() => {
+          scrollToBottom();
+        }, [messages]);
+
+        const handleSend = async () => {
+          if (!input.trim() || loading) return;
+
+          const userMsg = input.trim();
+          setInput('');
+          setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
+          setLoading(true);
+
+          try {
+            const res = await fetch('http://localhost:5000/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message: userMsg })
+            });
+            const data = await res.json();
+            setMessages(prev => [...prev, { role: 'ai', text: data.reply || "I'm having trouble connecting to my brain right now." }]);
+          } catch (err) {
+            setMessages(prev => [...prev, { role: 'ai', text: "Error: Could not reach the AI server. Is the backend running?" }]);
+          } finally {
+            setLoading(false);
+          }
+        };
+
+        return e(Fragment, null,
+          // Floating Toggle Button
+          e(motion.div, {
+            className: 'chatbot-toggle',
+            onClick: () => setIsOpen(!isOpen),
+            whileHover: { scale: 1.1 },
+            whileTap: { scale: 0.9 },
+            style: {
+              position: 'fixed', bottom: '30px', right: '30px', zIndex: 1000,
+              width: '60px', height: '60px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #52b788 0%, #00ffcc 100%)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', boxShadow: '0 10px 30px rgba(82, 183, 136, 0.5)',
+              border: '2px solid rgba(255,255,255,0.2)'
+            }
+          }, e('span', { style: { fontSize: '1.8rem' } }, isOpen ? "✕" : "🤖")),
+
+          // Chat Window
+          e(AnimatePresence, null,
+            isOpen && e(motion.div, {
+              initial: { opacity: 0, y: 50, scale: 0.9, transformOrigin: 'bottom right' },
+              animate: { opacity: 1, y: 0, scale: 1 },
+              exit: { opacity: 0, y: 50, scale: 0.9 },
+              style: {
+                position: 'fixed', bottom: '100px', right: '30px', zIndex: 1000,
+                width: '380px', height: '500px',
+                background: 'rgba(10, 25, 18, 0.9)', backdropFilter: 'blur(25px)',
+                border: '1px solid rgba(82, 183, 136, 0.3)', borderRadius: '25px',
+                overflow: 'hidden', display: 'flex', flexDirection: 'column',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.8)'
+              }
+            },
+              // Header
+              e('div', { style: { padding: '20px', background: 'rgba(82, 183, 136, 0.1)', borderBottom: '1px solid rgba(82, 183, 136, 0.2)', display: 'flex', alignItems: 'center', gap: '12px' } },
+                e('div', { style: { width: '10px', height: '10px', background: '#00ffcc', borderRadius: '50%', boxShadow: '0 0 10px #00ffcc' } }),
+                e('div', null,
+                  e('h3', { style: { fontSize: '0.9rem', color: '#fff', margin: 0 } }, "Gemini Climate Intelligence"),
+                  e('p', { style: { fontSize: '0.7rem', color: '#52b788', margin: 0 } }, "Online • UHI Specialist")
+                )
+              ),
+
+              // Messages Area
+              e('div', { style: { flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '15px' } },
+                messages.map((m, i) => e(motion.div, {
+                  key: i,
+                  initial: { opacity: 0, x: m.role === 'user' ? 20 : -20 },
+                  animate: { opacity: 1, x: 0 },
+                  style: {
+                    alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start',
+                    maxWidth: '80%', padding: '12px 16px', borderRadius: '18px',
+                    fontSize: '0.9rem', lineHeight: '1.4',
+                    background: m.role === 'user' ? '#2d6a4f' : 'rgba(255,255,255,0.05)',
+                    color: '#fff', border: m.role === 'user' ? 'none' : '1px solid rgba(82, 183, 136, 0.2)',
+                    borderBottomRightRadius: m.role === 'user' ? '4px' : '18px',
+                    borderBottomLeftRadius: m.role === 'ai' ? '4px' : '18px'
+                  }
+                }, m.text)),
+                loading && e(motion.div, {
+                  animate: { opacity: [0.4, 0.7, 0.4] },
+                  transition: { duration: 1.5, repeat: Infinity },
+                  style: { alignSelf: 'flex-start', background: 'rgba(255,255,255,0.05)', padding: '12px 16px', borderRadius: '18px', fontSize: '0.9rem', color: '#52b788' }
+                }, "Gemini is thinking..."),
+                e('div', { ref: chatEndRef })
+              ),
+
+              // Input Area
+              e('div', { style: { padding: '20px', background: 'rgba(0,0,0,0.2)', borderTop: '1px solid rgba(82, 183, 136, 0.2)', display: 'flex', gap: '10px' } },
+                e('input', {
+                  value: input,
+                  onChange: e => setInput(e.target.value),
+                  onKeyPress: e => e.key === 'Enter' && handleSend(),
+                  placeholder: "Ask about heat island effects...",
+                  style: {
+                    flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(82, 183, 136, 0.2)',
+                    borderRadius: '20px', padding: '10px 15px', color: '#fff', outline: 'none', fontSize: '0.85rem'
+                  }
+                }),
+                e(motion.button, {
+                  whileHover: { scale: 1.05 },
+                  whileTap: { scale: 0.95 },
+                  onClick: handleSend,
+                  style: {
+                    background: '#52b788', border: 'none', borderRadius: '50%',
+                    width: '38px', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', color: '#0a1912'
+                  }
+                }, "➤")
+              )
+            )
+          )
+        );
+      };
+
       // Framer Motion Variants
       const containerVar = {
         hidden: { opacity: 0 },
@@ -2499,7 +2633,8 @@
           e('div', { className: 'ui-controls' },
             e('button', { className: 'btn-circle', style: { fontSize: '1.2rem' }, onClick: () => setSidebar(!sidebar) }, sidebar ? "✕" : "☰"),
             e('button', { className: 'btn-circle', onClick: onBack }, "↩")
-          )
+          ),
+          e(GeminiChatbot, null)
         );
       };
 
